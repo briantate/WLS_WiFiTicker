@@ -1,0 +1,7 @@
+#ignore compiled files
+/D21_StockTicker/D21_StockTicker/Debug/
+/D21_StockTicker/.vs/
+/D21_StockTicker/D21_StockTicker/src/password.h
+HTTP_Response.txt
+HttpRequesterResponse.PNG
+HttpRequesterResponse2.PNG
