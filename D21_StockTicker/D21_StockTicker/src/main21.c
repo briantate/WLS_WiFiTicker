@@ -179,7 +179,7 @@ static void socket_cb(SOCKET sock, uint8_t u8Msg, void *pvMsg)
 				
 				printf("Enter Stock Ticker Name: ");
 				scanf("%s", ticker);
-				printf("%s\r\n\r\n\r\n", ticker);
+				printf("\r\n%s\r\n\r\n\r\n", ticker);
 				sprintf((char *)gau8ReceivedBuffer, "%s%s%s", MAIN_PREFIX_BUFFER, (char *)ticker, MAIN_POST_BUFFER);
 				printf("HTTP Request:\r\n%s\r\n",gau8ReceivedBuffer);
 
@@ -206,9 +206,11 @@ static void socket_cb(SOCKET sock, uint8_t u8Msg, void *pvMsg)
 
 			tstrSocketRecvMsg *pstrRecv = (tstrSocketRecvMsg *)pvMsg;
 			if(pstrRecv && pstrRecv->s16BufferSize > 0){
-				printf("%s\r\n",pstrRecv->pu8Buffer);
+				printf("\r\nBuffer size %d\r\n",pstrRecv->s16BufferSize);
+				printf("Remaining size %d\r\n",pstrRecv->u16RemainingSize);
+				printf("HTTP Response:\r\n%s\r\n",pstrRecv->pu8Buffer);
 				
-				printf("%d\r\n",pstrRecv->s16BufferSize);
+				
 /*
 				// Get Stock Ticker Name
 				pcIndxPtr = strstr((char *)pstrRecv->pu8Buffer, ticker);
@@ -223,6 +225,7 @@ static void socket_cb(SOCKET sock, uint8_t u8Msg, void *pvMsg)
 				//break;
 				
 				//Check another price
+/*
 				printf("\r\n\r\nEnter Stock Ticker Name: ");
 				scanf("%s", ticker);
 				printf("%s\r\n\r\n\r\n", ticker);
@@ -230,8 +233,9 @@ static void socket_cb(SOCKET sock, uint8_t u8Msg, void *pvMsg)
 				printf("HTTP Request:\r\n%s\r\n",gau8ReceivedBuffer);
 				
 				send(tcp_client_socket, gau8ReceivedBuffer, strlen((char *)gau8ReceivedBuffer), 0);
-
+*/
 				memset(gau8ReceivedBuffer, 0, MAIN_WIFI_M2M_BUFFER_SIZE);
+				printf("\r\nreceive again\r\n");
 				recv(tcp_client_socket, &gau8ReceivedBuffer[0], MAIN_WIFI_M2M_BUFFER_SIZE, 0);
 				
 			}
