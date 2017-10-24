@@ -105,7 +105,8 @@ extern "C" {
 
 /** Receive buffer size. */
 //#define MAIN_WIFI_M2M_BUFFER_SIZE           1400
-#define MAIN_WIFI_M2M_BUFFER_SIZE           1500
+#define MAIN_WIFI_M2M_BUFFER_SIZE           100
+#define TICKER_SIZE 10
 
 #define MAIN_HEX2ASCII(x)                   (((x) >= 10) ? (((x) - 10) + 'A') : ((x) + '0'))
 

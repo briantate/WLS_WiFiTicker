@@ -101,6 +101,7 @@
 
 /** IP address of host. */
 uint32_t gu32HostIp = 0;
+static volatile bool lastRecv = false;
 
 /** UART module for debug. */
 static struct usart_module cdc_uart_module;
@@ -110,6 +111,7 @@ static SOCKET tcp_client_socket = -1;
 
 /** Receive buffer definition. */
 static uint8_t gau8ReceivedBuffer[MAIN_WIFI_M2M_BUFFER_SIZE] = {0};
+static uint8_t gau8ParseBuffer[2*MAIN_WIFI_M2M_BUFFER_SIZE] = {0}; //save 2 receive buffers to parse
 
 /** Wi-Fi status variable. */
 static bool gbConnectedWifi = false;
@@ -167,8 +169,7 @@ static void resolve_cb(uint8_t *hostName, uint32_t hostIp)
  */
 static void socket_cb(SOCKET sock, uint8_t u8Msg, void *pvMsg)
 {
-	
-	static char ticker[10];
+	static char ticker[TICKER_SIZE];
 	/* Check for socket event on TCP socket. */
 	if (sock == tcp_client_socket) {
 		switch (u8Msg) {
@@ -181,7 +182,7 @@ static void socket_cb(SOCKET sock, uint8_t u8Msg, void *pvMsg)
 				scanf("%s", ticker);
 				printf("\r\n%s\r\n\r\n\r\n", ticker);
 				sprintf((char *)gau8ReceivedBuffer, "%s%s%s", MAIN_PREFIX_BUFFER, (char *)ticker, MAIN_POST_BUFFER);
-				printf("HTTP Request:\r\n%s\r\n",gau8ReceivedBuffer);
+//				printf("HTTP Request:\r\n%s\r\n",gau8ReceivedBuffer);
 
 				tstrSocketConnectMsg *pstrConnect = (tstrSocketConnectMsg *)pvMsg;
 				if (pstrConnect && pstrConnect->s8Error >= SOCK_ERR_NO_ERROR) {
@@ -203,41 +204,70 @@ static void socket_cb(SOCKET sock, uint8_t u8Msg, void *pvMsg)
 		{
 			char *pcIndxPtr;
 			char *pcEndPtr;
+			
 
 			tstrSocketRecvMsg *pstrRecv = (tstrSocketRecvMsg *)pvMsg;
 			if(pstrRecv && pstrRecv->s16BufferSize > 0){
-				printf("\r\nBuffer size %d\r\n",pstrRecv->s16BufferSize);
-				printf("Remaining size %d\r\n",pstrRecv->u16RemainingSize);
-				printf("HTTP Response:\r\n%s\r\n",pstrRecv->pu8Buffer);
+				//printf("\r\nBuffer size %d\r\n",pstrRecv->s16BufferSize);
+				//printf("Remaining size %d\r\n",pstrRecv->u16RemainingSize);
+				//printf("HTTP Response:\r\n%s\r\n",pstrRecv->pu8Buffer);
 				
+				if (lastRecv){
+					printf("concatenating\r\n");
+					lastRecv = false;
+					//concatenate the new recv buffer onto the buffer with end of header (to make sure we have all the data)
+					strcat((char *)pstrRecv->pu8Buffer,(char *)gau8ParseBuffer); //concatenate
+//					printf("data found!\r\n");
+//					printf("%s\r\n",gau8ParseBuffer); //print the full buffer
+				}
+				else{ //EoH not found in previous call
+					pcIndxPtr = strstr((char *)pstrRecv->pu8Buffer, "\r\n\r\n"); //search for end of headers
 				
-/*
+					if (NULL != pcIndxPtr) {  //found end of header
+//						printf("found EoH!\r\n");
+						memcpy((char *)gau8ParseBuffer, (char *)pstrRecv->pu8Buffer, MAIN_WIFI_M2M_BUFFER_SIZE);//save this 
+						pcIndxPtr = strstr((char *)pstrRecv->pu8Buffer, ticker); //search for data
+						if(NULL != pcIndxPtr){	//data found!	
+//							printf("data found!\r\n");	
+//							printf("ParseBuffer:\r\n%s\r\n",gau8ParseBuffer); //print the full buffer
+						}
+						else{ //didn't find data, need to grab one more packet
+							lastRecv = true; //call recv() 1 last time
+							memset((char *)gau8ReceivedBuffer, 0, MAIN_WIFI_M2M_BUFFER_SIZE);
+							recv(tcp_client_socket, &gau8ReceivedBuffer[0], MAIN_WIFI_M2M_BUFFER_SIZE, 0);
+//							printf("last recv()!\r\n");
+							break;
+						}
+					}
+					else{ //didn't find end of header
+						memset((char *)gau8ReceivedBuffer, 0, MAIN_WIFI_M2M_BUFFER_SIZE);
+						recv(tcp_client_socket, &gau8ReceivedBuffer[0], MAIN_WIFI_M2M_BUFFER_SIZE, 0);
+//						printf("calling recv()\r\n");
+						break;
+					}
+				} //end else for search
+
+				//parse for MCHP stuff
 				// Get Stock Ticker Name
-				pcIndxPtr = strstr((char *)pstrRecv->pu8Buffer, ticker);
+				pcIndxPtr = strstr((char *)gau8ParseBuffer, ticker);
 				pcEndPtr = strstr((char *)pcIndxPtr, ",");
 				printf("\r\nTicker Name  : %.*s",(pcEndPtr - pcIndxPtr - 1),pcIndxPtr);
 
-				// Get Latest Value 
+				// Get Latest Value
 				pcIndxPtr = pcEndPtr + 1;
 				pcEndPtr = strstr(pcIndxPtr, ",");
 				printf("\r\nLatest Value : $%.*s",(pcEndPtr - pcIndxPtr - 1),pcIndxPtr);
-*/
-				//break;
 				
 				//Check another price
-/*
-				printf("\r\n\r\nEnter Stock Ticker Name: ");
+				memset((char *)ticker, 0, TICKER_SIZE);
+				printf("\r\n\r\nEnter Stock Ticker Name:");
 				scanf("%s", ticker);
-				printf("%s\r\n\r\n\r\n", ticker);
+				printf("\r\n%s\r\n\r\n", ticker);
 				sprintf((char *)gau8ReceivedBuffer, "%s%s%s", MAIN_PREFIX_BUFFER, (char *)ticker, MAIN_POST_BUFFER);
-				printf("HTTP Request:\r\n%s\r\n",gau8ReceivedBuffer);
-				
+//				printf("HTTP Request:\r\n%s\r\n",gau8ReceivedBuffer);			
 				send(tcp_client_socket, gau8ReceivedBuffer, strlen((char *)gau8ReceivedBuffer), 0);
-*/
-				memset(gau8ReceivedBuffer, 0, MAIN_WIFI_M2M_BUFFER_SIZE);
-				printf("\r\nreceive again\r\n");
-				recv(tcp_client_socket, &gau8ReceivedBuffer[0], MAIN_WIFI_M2M_BUFFER_SIZE, 0);
-				
+				//break;
+					
 			}
 			else{
 				/*Receiver Error*/
@@ -289,6 +319,9 @@ static void wifi_cb(uint8_t u8MsgType, void *pvMsg)
 		} else if (pstrWifiState->u8CurrState == M2M_WIFI_DISCONNECTED) {
 			printf("wifi_cb: M2M_WIFI_DISCONNECTED\r\n");
 			gbConnectedWifi = false;
+			//reconnect
+			m2m_wifi_connect((char *)ACCESS_POINT_SSID, sizeof(ACCESS_POINT_SSID), ACCESS_POINT_SEC, (char *) ACCESS_POINT_PWD, M2M_WIFI_CH_ALL);
+			
 		}
 
 		break;
@@ -390,6 +423,17 @@ int main(void)
 */
 	printf("Attempting to connect to %s\r\n", ACCESS_POINT_SSID);
 	m2m_wifi_connect((char *)ACCESS_POINT_SSID, sizeof(ACCESS_POINT_SSID), ACCESS_POINT_SEC, (char *) ACCESS_POINT_PWD, M2M_WIFI_CH_ALL);
+
+/*
+	char temp_ssid[20];
+	char temp_password[20];
+	printf("Enter SSID\r\n");
+	scanf("%s", temp_ssid);
+	printf("Enter password\r\n");
+	scanf("%s", temp_password);
+	printf("Attempting to connect to %s\r\n", temp_ssid);
+	m2m_wifi_connect((char *)temp_ssid, sizeof(temp_ssid), ACCESS_POINT_SEC, (char *) temp_password, M2M_WIFI_CH_ALL);
+*/
 
 	while (1) {
 		m2m_wifi_handle_events(NULL);
